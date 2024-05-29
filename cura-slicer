@@ -188,8 +188,7 @@ if ($conf->{definition} eq "" or !-e $definitionPath) {
 
       print "\n";
    }
-}make install
-
+}
 
 my @fs;
 
