@@ -142,10 +142,7 @@ if ($conf->{definition} eq "" or !-e $definitionPath) {
          my $id = 0;
          foreach my $row (@sortedDefinitions) {
             $id++;
-            my $match = $row->{match};
-            my $name = $row->{name};
-            my $file = $row->{definition};
-            print "  $id)   $name / $file ($match)\n";
+            print "  $id)   $row->{name} ($row->{definition})\n";
          }
 
          print "\nSelect number of definition or leave empty to try again\n> ";
