@@ -1,5 +1,5 @@
 APPNAME = Cura-CLI-Wrapper
-VERSION = 0.0.7
+VERSION = 0.0.8
 DEST = /usr/local/bin
 DEST_SETTINGS = /usr/share
 
@@ -14,7 +14,7 @@ install::	install-app install-defaults
 
 install-app::
 	sudo cp cura-slicer ${DEST}/
-	mkdir -p ~/.config/cura-slicer/ && touch ~/.config/cura-slicer/base.ini 
+	mkdir -p ~/.config/cura-slicer/ && touch ~/.config/cura-slicer/base.ini
 
 install-defaults::
 	sudo mkdir -p ${DEST_SETTINGS}/cura-slicer/

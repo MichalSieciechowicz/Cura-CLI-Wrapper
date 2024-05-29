@@ -23,7 +23,7 @@ See [Cura CLI Wrapper (cura-slicer)](https://xyzdims.com/2021/03/24/3d-printing-
 
 # Usage
 ```
-USAGE Cura-Slicer 0.0.7 aka Cura-CLI-Wrapper (CuraEngine 4.4.1): [<opts>] <file.stl> ...
+USAGE Cura-Slicer 0.0.8 aka Cura-CLI-Wrapper (CuraEngine 4.4.1): [<opts>] <file.stl> ...
    options:
       -v or --verbose         increase verbosity
       -vv or --verbose=2          "       "
