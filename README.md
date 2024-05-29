@@ -33,6 +33,8 @@ USAGE Cura-Slicer 0.0.7 aka Cura-CLI-Wrapper (CuraEngine 4.4.1): [<opts>] <file.
       --output=<fn>           set output filename
       --output <fn>             "         "
       -o <fn>                   "         "
+      --definition            show prompt to find definition
+      --definition <d>        set definition for this run
       --binary=<exe>          set executable of CuraEngine (default: CuraEngine)
       --version=<v>           set version of CuraEngine (default: 4)
       --<k>=<v>               set CuraEngine settings (keys with '-' will be converted to '_')
@@ -42,7 +44,7 @@ USAGE Cura-Slicer 0.0.7 aka Cura-CLI-Wrapper (CuraEngine 4.4.1): [<opts>] <file.
    examples:
       cura-slicer --help
       cura-slicer --help retract
-      cura-slicer -hv retract 
+      cura-slicer -hv retract
       cura-slicer sphere.stl
       cura-slicer overhang.stl --output=sample.gcode
       cura-slicer overhang.stl --layer-height=0.1 --support-enable=true -o sample.gcode

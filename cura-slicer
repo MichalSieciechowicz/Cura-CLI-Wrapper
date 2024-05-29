@@ -291,6 +291,8 @@ if($conf->{help} || @fs <= 0) {
       --output=<fn>           set output filename
       --output <fn>             \"         \"
       -o <fn>                   \"         \"
+      --definition            show prompt to find definition
+      --definition <d>        set definition for this run
       --binary=<exe>          set executable of CuraEngine (default: $conf->{binary})
       --version=<v>           set version of CuraEngine (default: $conf->{version})
       --<k>=<v>               set CuraEngine settings (keys with '-' will be converted to '_')
