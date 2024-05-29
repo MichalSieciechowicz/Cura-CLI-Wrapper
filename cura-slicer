@@ -10,16 +10,17 @@
 # Description:
 #   It provides simple wrapper around CuraEngine itself with the ability to query all possible settings
 #
-#   For technical details see at 
+#   For technical details see at
 #        https://github.com/Spiritdude/Cura-CLI-Wrapper
 #     and
 #        https://xyzdims.com/2021/03/24/3d-printing-cura-cli-wrapper-cura-slicer/
 #
 # History:
+# 2024/05/29: 0.0.8: definition finder support
 # 2021/05/01: 0.0.7: set executable & version (support v3, v4 of CuraEngine)
 # 2021/03/24: 0.0.5: properly track source of settings with $confsrc->{key}
 # 2021/03/24: 0.0.4: --load <config> support added
-# 2021/03/23: 0.0.2: --help gives all settings, or --help <term> queries matches, -v and -vv (2 levels of verbosity), 
+# 2021/03/23: 0.0.2: --help gives all settings, or --help <term> queries matches, -v and -vv (2 levels of verbosity),
 # 2021/03/23: 0.0.1: just a small script to ease the CuraEngine usage
 
 use strict;
@@ -32,13 +33,33 @@ my $VERSION = '0.0.7';
 
 my($app) = ($0=~/\/([^\/]+)$/);
 
-my $conf = {  
+my $conf = {
    verbose => 0,
    binary => "CuraEngine",
    binary_version => '???',
    version => 4,
-   definition => "/usr/share/$app/fdmprinter.def.json"
+   definition => "",
 };
+
+my $configPath = "$ENV{HOME}/.config/$app";
+my $configFile = "$configPath/defaultDefinition";
+
+if (-e $configFile) {
+   open(my $fh,"<",$configFile);
+   $conf->{definition} = <$fh>;
+   close $fh;
+}
+
+for(my $i=0; $i<@ARGV; $i++) {                        # -- preprocess all command-line arguments
+   $_ = $ARGV[$i];
+   if ($_ eq "--definition") {
+      my $next = $i + 1;
+      $conf->{definition} = $ARGV[$next];
+   }
+}
+
+
+my $definitionDir = "/usr/share/$app/definitions";
 
 my $confsrc;      # -- store source of a configuration setting (cli, default of config file)
 
@@ -49,11 +70,6 @@ my %if = ( 'verbose' => 1, binary => 1, output => 1, 'load' => 1 );             
 
 my(@slicer_args,@slicer_args_cli);
 
-if(!-e $conf->{definition}) {
-   print "$app ERROR: $conf->{definition} doesn't exist\n";
-   exit -1;
-}
-
 foreach my $p ("/usr/share/$app","$ENV{HOME}/.config/$app") {
    my $c = parseConfig($p."/base.ini");
    foreach my $k (keys %$c) {
@@ -61,6 +77,119 @@ foreach my $p ("/usr/share/$app","$ENV{HOME}/.config/$app") {
       push(@slicer_args,'-s',"$k=$c->{$k}");
    }
 }
+my $definitionPath = "$definitionDir/$conf->{definition}.def.json";
+
+if ($conf->{definition} eq "" or !-e $definitionPath) {
+   if ($conf->{definition} eq "") {
+      print "$app WARNING: definition not set\n";
+   } else {
+      print "$app WARNING: definition '$conf->{definition}' doesn't exist\n";
+   }
+   my $selectedDefinition = "";
+   my @sortedDefinitions = ();
+   my @matchedDefinitions = ();
+   while ($selectedDefinition == "") {
+      print "Enter printer name\n> ";
+      my $printerName = <STDIN>;
+      chomp($printerName);
+      if ($printerName eq "") {
+         $selectedDefinition = "-1";
+      } else {
+         $selectedDefinition = "";
+         my @keywords = split(/\s+/, $printerName);
+         @matchedDefinitions = ();
+         opendir(my $dh, $definitionDir) or die "Cannot open definition directory: $!\n";
+         while (my $file = readdir($dh)) {
+            next if $file eq '.' or $file eq '..' or $file !~ /def.json$/;
+            my $filepath = "$definitionDir/$file";
+            my $match = 0;
+            my $name = $file;
+
+            open(my $fh, '<', $filepath) or die "Cannot open definition file '$file': $!";
+            while (my $line = <$fh>) {
+               #print "$line\n";
+               if ($line =~ /^\s+"name":\s+"(.+)"/) {
+                  $name = $1;
+                  last;
+               }
+            }
+            close($fh);
+
+            foreach my $keyword (@keywords) {
+               if (index(lc($file), lc($keyword)) != -1) {
+                  $match++;
+               } else {
+                  $match -= 2;
+               }
+            }
+
+            if ($match > 0) {
+               my @matchedDefinition = {
+                  "file" => $file,
+                  "match" => $match,
+                  "name" => $name,
+                  "file" => $file,
+                  "definition" => substr($file, 0, -9),
+               };
+               push(@matchedDefinitions, @matchedDefinition);
+            }
+         }
+
+         closedir($dh);
+
+         @sortedDefinitions = sort { $b->{match} <=> $a->{match} } @matchedDefinitions;
+         print "\nFound definitions:\n";
+         my $id = 0;
+         foreach my $row (@sortedDefinitions) {
+            $id++;
+            my $match = $row->{match};
+            my $name = $row->{name};
+            my $file = $row->{definition};
+            print "  $id)   $name / $file ($match)\n";
+         }
+
+         print "\nSelect number of definition or leave empty to try again\n> ";
+         $selectedDefinition = <STDIN>;
+         chomp($selectedDefinition);
+      }
+   }
+
+   if ($selectedDefinition eq "-1") {
+      print "\nDefinition not set!\`";
+      exit -1;
+   } else {
+      my $index = $selectedDefinition - 1;
+      my $current = @sortedDefinitions[$index];
+      my $name = $current->{name};
+      $conf->{definition} = $current->{definition};
+      $definitionPath = "$definitionDir/$conf->{definition}.def.json";
+
+      foreach my $p ("/usr/share/$app","$ENV{HOME}/.config/$app") {
+         my $c = parseConfig($p."/base.ini");
+         foreach my $k (keys %$c) {
+            $conf->{$k} = $c->{$k};
+            push(@slicer_args,'-s',"$k=$c->{$k}");
+         }
+      }
+
+      print "Save the definition as default for future? [y/N]\n> ";
+      my $save = <STDIN>;
+      chomp($save);
+      $save = lc($save);
+      if ($save eq "y") {
+         if (!-d $configPath) {
+            make_path($configPath);
+         }
+         open(my $fh, '>', $configFile) or die "Cannot open file '$configFile' $!";
+         print $fh "$conf->{definition}";
+         close($fh);
+         print "Saved!\n";
+      }
+
+      print "\n";
+   }
+}make install
+
 
 my @fs;
 
@@ -70,7 +199,7 @@ for(my $i=0; $i<@ARGV; $i++) {                        # -- preprocess all comman
    my($k,$v);
 
    $_ = $ARGV[$i];
-   
+
    if(/^--([\w\-\.]+)=(.*)$/) {                       # -- parse '--key=value'
       $k = $1, $v = $2;
       my $k_ = $k; $k_ =~ s/\-/_/g;
@@ -90,7 +219,7 @@ for(my $i=0; $i<@ARGV; $i++) {                        # -- preprocess all comman
          $conf->{$k_} = $v;
          push(@slicer_args_cli,("-s","$k_=$v"));      #    if not push it on the argument list for CuraEngine
       }
-      
+
    } elsif(/^--([\w\-\.]+)$/) {                       # -- general switches '--key'
       $k = $1, $k =~ s/\-/_/g;
       if($f2a{$k}) {                                  # -- additional arg?
@@ -131,7 +260,7 @@ if($conf->{version}==1) {
 } elsif($conf->{help}) {
    local $/;
 
-   open(my $fh,"<",$conf->{definition});
+   open(my $fh,"<",$definitionPath);
    my $json = <$fh>;
    close $fh;
 
@@ -171,7 +300,7 @@ if($conf->{help} || @fs <= 0) {
    examples:
       $app --help
       $app --help retract
-      $app -hv retract 
+      $app -hv retract
       $app sphere.stl
       $app overhang.stl --output=sample.gcode
       $app overhang.stl --layer-height=0.1 --support-enable=true -o sample.gcode
@@ -184,17 +313,17 @@ print "== $APPNAME aka $GITHUB_NAME $VERSION ($conf->{binary} $conf->{binary_ver
 
 foreach my $fn (@fs) {
    my $t = time();
-   
+
    unless(-e $fn) {
       print STDERR "$app ERROR: file not accessible '$fn'\n";
       exit -1;
    }
-   my $fout = $fn; 
-   
+   my $fout = $fn;
+
    $fout =~ s/\.(\w+)$/.gcode/;
    $fout .= ".gcode" unless($fout =~ /\.gcode$/i);
    $fout = $conf->{output} if(defined $conf->{output});
-   
+
    print "processing $fn, slicing to $fout\n";
    if(fork()==0) {
       my(@a) = ($conf->{binary});
@@ -203,19 +332,19 @@ foreach my $fn (@fs) {
          push(@a,"-o",$fout);
          push(@a,$fn);
       } else {
-         push(@a,"slice","-j",$conf->{definition},@slicer_args);
+         push(@a,"slice","-j",$definitionPath,@slicer_args);
          push(@a,"-l",$fn);
          push(@a,"-o",$fout);
       }
       print "$app INF: @a\n" if($conf->{verbose});
       # -- is important, as CuraEngine is chatty and closing only STDERR will pollute the resulting G-code with error messages(!!)
-      close STDERR, close STDOUT if($conf->{verbose}<2);      
+      close STDERR, close STDOUT if($conf->{verbose}<2);
       exec(@a);
       exit 0;        # -- if $conf->{binary} doesn't exist, or otherwise fails, it will come here
    }
    wait;
    if(!-e $fout || (stat($fout))[7]==0) {    # -- CuraEngine creates also zero-byte .gcode output in case of error
-      unlink $fout;     # -- if it's zero byte, then remove it 
+      unlink $fout;     # -- if it's zero byte, then remove it
       print "$app ERROR: $app ($conf->{binary}) did not generate any gcode, abort.\n";
       print "$app HINT: execute with -vv to see the actual problem\n" unless($conf->{verbose}>1);
       exit -1;
